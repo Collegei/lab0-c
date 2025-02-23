@@ -10,18 +10,48 @@
  *   cppcheck-suppress nullPointer
  */
 
+
 /* Create an empty queue */
 struct list_head *q_new()
 {
-    return NULL;
+    struct list_head *h = (struct list_head *) malloc(sizeof(struct list_head));
+    if (!h)
+        return NULL;
+    INIT_LIST_HEAD(h);
+    return h;
 }
 
 /* Free all storage used by queue */
-void q_free(struct list_head *head) {}
+void q_free(struct list_head *head)
+{
+    struct list_head *n, *s;
+    list_for_each_safe (n, s, head) {
+        list_del(n);
+        q_release_element(list_entry(n, element_t, list));
+    }
+    free(head);
+}
+
+#ifndef strlcpy
+#define strlcpy(dst, src, sz) snprintf((dst), (sz), "%s", (src))
+#endif
 
 /* Insert an element at head of queue */
 bool q_insert_head(struct list_head *head, char *s)
 {
+    if (!head)
+        return false;
+    element_t *e = malloc(sizeof(element_t));
+    if (!e)
+        return false;
+    const int len = strlen(s) + 1;
+    e->value = malloc(sizeof(char) * len);
+    if (!e->value) {
+        free(e);
+        return false;
+    }
+    list_add(&e->list, head);
+    strlcpy(e->value, s, len);
     return true;
 }
 
@@ -34,7 +64,14 @@ bool q_insert_tail(struct list_head *head, char *s)
 /* Remove an element from head of queue */
 element_t *q_remove_head(struct list_head *head, char *sp, size_t bufsize)
 {
-    return NULL;
+    if (!head || head->next == head)
+        return NULL;
+    element_t *e = list_entry(head->next, element_t, list);
+    list_del(&e->list);
+    if (sp) {
+        strlcpy(sp, e->value, bufsize);
+    }
+    return e;
 }
 
 /* Remove an element from tail of queue */
