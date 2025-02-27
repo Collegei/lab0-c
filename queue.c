@@ -180,92 +180,56 @@ int q_descend(struct list_head *head)
     return 0;
 }
 
-#define bind(la, lb) ((la)->next = (lb), (lb)->prev = (la))
-#define contex_entry(n) list_entry((n), queue_contex_t, chain)
+#define qu(node) list_entry(node, queue_contex_t, chain)->q
 
-/* Merge two sorted non-empty lists in to a double-circular-linked-list.
- * Return it's head. */
-struct list_head *merge_two_list(struct list_head *la, struct list_head *lb)
+/* Merge two sorted queues into a sorted non-empty queue with specified head.
+ */
+void merge_two_list(struct list_head *qa,
+                    struct list_head *qb,
+                    struct list_head *head_to)
 {
-    struct list_head *head = NULL, *tail = NULL;
-    struct list_head **back = &head;
-    while (la && lb) {
-        const char *va = list_entry(la, element_t, list)->value;
-        const char *vb = list_entry(lb, element_t, list)->value;
+    while (!list_empty(qa) && !list_empty(qb)) {
+        const char *va = list_entry(qa->next, element_t, list)->value;
+        const char *vb = list_entry(qb->next, element_t, list)->value;
         if (strcmp(va, vb) < 0) {
-            *back = la;
-            la->prev = tail;
-            tail = la;
+            list_move_tail(qa->next, head_to);
         } else {
-            *back = lb;
-            lb->prev = tail;
-            tail = lb;
+            list_move_tail(qb->next, head_to);
         }
-        back = &(*back)->next;
     }
-    if (la)
-        *back = la;
+    if (!list_empty(qa))
+        list_splice_tail_init(qa, head_to);
     else
-        *back = lb;
-
-    bind(tail, head);
-    return head;
+        list_splice_tail_init(qb, head_to);
 }
+
 
 /* Merge all the queues into one sorted queue, which is in ascending/descending
  * order */
 int q_merge(struct list_head *head, bool descend)
 {
     // https://leetcode.com/problems/merge-k-sorted-lists/
-    if (head->next == head)
+    if (list_empty(head) || list_is_singular(head))
         return 0;
 
-    while (head->next->next != head && contex_entry(head->next->next)->q) {
-        struct list_head *slow, *fast = head;
-        list_for_each (slow, head) {
-            if (fast->next == head || !contex_entry(fast->next)->q)
-                break;
-            if (fast->next->next == head ||
-                !contex_entry(fast->next->next)->q) {
-                struct list_head *h = contex_entry(fast->next)->q;
-                contex_entry(fast->next)->q = NULL;
+    int len = q_size(head);
 
-                contex_entry(slow)->q = h;
-                break;
-            }
-
-            struct list_head *ha = contex_entry(fast->next)->q;
-            contex_entry(fast->next)->q = NULL;
-
-            struct list_head *hb = contex_entry(fast->next->next)->q;
-            contex_entry(fast->next->next)->q = NULL;
-
-            if (!ha || ha->next == ha) {  // queue a is NULL or empty
-                if (ha)
-                    free(ha);
-                contex_entry(slow)->q = hb;
-                continue;
-            }
-
-            if (!hb || hb->next == hb) {  // queue b is NULL or empty
-                if (hb)
-                    free(hb);
-                contex_entry(slow)->q = ha;
-                continue;
-            }
-
-            ha->prev->next = NULL;
-            hb->prev->next = NULL;
-            struct list_head *lm = merge_two_list(ha->next, hb->next);
-
-            bind(lm->prev, ha);
-            bind(ha, lm);
-            free(hb);
-
-            contex_entry(slow)->q = ha;
+    while (len > 1) {
+        struct list_head *slow = head, *fast = head;
+        for (int i = 0; i < len / 2; i++) {
+            slow = slow->next;
+            fast = fast->next->next;
+            merge_two_list(qu(fast->prev), qu(fast), qu(slow));
         }
+
+        if (len % 2 == 1)
+            list_splice_init(qu(fast->next), qu(slow->next));
+
+        len = (len + 1) / 2;
     }
+
     if (descend)
-        q_reverse(contex_entry(head->next)->q);
-    return q_size(contex_entry(head->next)->q);
+        q_reverse(qu(head->next));
+
+    return q_size(qu(head->next));
 }
