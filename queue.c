@@ -188,21 +188,32 @@ void merge_two_list(struct list_head *qa,
                     struct list_head *qb,
                     struct list_head *head_to)
 {
-    while (!list_empty(qa) && !list_empty(qb)) {
+    struct list_head *ta = (qa->prev != qa ? qa->prev : NULL);
+    struct list_head *tb = (qb->prev != qb ? qb->prev : NULL);
+
+    int na = q_size(qa), nb = q_size(qb);
+
+    while (na && nb) {
         const char *va = list_entry(qa->next, element_t, list)->value;
         const char *vb = list_entry(qb->next, element_t, list)->value;
+
         if (strcmp(va, vb) < 0) {
             list_move_tail(qa->next, head_to);
+            na--;
         } else {
             list_move_tail(qb->next, head_to);
+            nb--;
         }
     }
-    if (!list_empty(qa))
-        list_splice_tail_init(qa, head_to);
-    else
-        list_splice_tail_init(qb, head_to);
-}
 
+    if (na || nb) {
+        struct list_head **head_from = (na ? &qa : &qb);
+        struct list_head **tail_from = (na ? &ta : &tb);
+        struct list_head tmp;
+        list_cut_position(&tmp, *head_from, *tail_from);
+        list_splice_tail(&tmp, head_to);
+    }
+}
 
 /* Merge all the queues into one sorted queue, which is in ascending/descending
  * order */
